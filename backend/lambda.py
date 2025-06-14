@@ -23,17 +23,18 @@ TOP_K: int = 250
 TOP_P: float = 0.99
 STOP_SEQUENCES = ["\n\nHuman:"]
 
-DEFAULT_PROMPT_TEMPLATE = """You are a master branding consultant who specializes in naming brands.\n
+DEFAULT_PROMPT_TEMPLATE = """You are a trip planner manager and your goal is to design an amazing trip expirience based on the place your customers wants to travel, 
+take in consideration the following information:.\n
+Location, Date, time and number or people that are going the trip and how adventurousness the people is from a scale from 1 to 10
+with that you need to generate a full itinerary agenda with places to go, important landmakrs, things to do
 
-You come up with a catchy and memorable brand names.
+<arrive-date>{arrive_date}</arrive-date>
+<departure-date>{arrive_date}</departure-date>
+<place>{destination}</place>
+<passengers>{tickets}</passengers>
+<adventurousness>{adventurousness}</adventurousness>
 
-Take the brand description below and use it to create the name for a brand.
-
-<brand-description>{brand_description}</brand-description>
-
-then based on the description and you hot new brand name give the brand a score 1-10 for how likely it is to succeed.
-
-{format_instructions}
+We need the response as plain text
 """
 
 class BrandInfo(BaseModel):
@@ -61,36 +62,36 @@ def build_chain(prompt_template):
         },
     )
 
-    parser = PydanticOutputParser(pydantic_object=BrandInfo)
+    #parser = PydanticOutputParser(pydantic_object=BrandInfo)
 
     prompt = PromptTemplate(
         template=prompt_template,
-        input_variables=["brand_description"],
-        partial_variables={"format_instructions": parser.get_format_instructions()}
+        input_variables=["arrive_date", "departure_date", "destination", "tickets", "adventurousness"],
+        #partial_variables={"format_instructions": parser.get_format_instructions()}
     )
 
     qa = LLMChain(llm=llm, prompt=prompt)
     return qa
 
-def run_chain(chain, question: str):
-    return chain.invoke({"brand_description": question})
+def run_chain(chain, startDate: str, endDate: str, destination, tickets, adventurousness):
+    return chain.invoke({"arrive_date": startDate, "departure_date": endDate, "destination":destination, "tickets":tickets, "adventurousness":adventurousness})
 
-def run_chatbot_request(question):
+def run_chatbot_request(startDate, endDate, destination, tickets, adventurousness):
     try:
         llm_chain = build_chain(DEFAULT_PROMPT_TEMPLATE)
     except Exception as e:
         return {"error building chain": str(e), "trace": traceback.format_exc()}
     try:
-        result = run_chain(llm_chain, question)
+        result = run_chain(llm_chain, startDate, endDate, destination, tickets, adventurousness)
     except Exception as e:
         return {"error running chain": str(e), "trace": traceback.format_exc()}
     # Return answer which is result, and then document list as sources
     return result
 
 
-def get_an_answer(question):
+def get_an_answer(startDate, endDate, destination, tickets, adventurousness):
     try:
-        return run_chatbot_request(question)
+        return run_chatbot_request(startDate, endDate, destination, tickets, adventurousness)
     except Exception as e:
         return {"error": str(e), "trace": traceback.format_exc()}
 
@@ -99,7 +100,11 @@ def lambda_handler(event, _):
     response = {}
 
     request_body = json.loads(event["body"])
-    question = request_body.get("question", "")
+    startDate = request_body.get("startDate", "")
+    endDate = request_body.get("endDate", "")
+    destination = request_body.get("destination", "")
+    tickets = request_body.get("tickets", "")
+    adventurousness = request_body.get("adventurousness", "")
 
     try:
         response["statusCode"] = 200
@@ -107,20 +112,11 @@ def lambda_handler(event, _):
             "Access-Control-Allow-Origin": "*",
             "content-type": "application/json",
         }
-        resp = get_an_answer(question)
-        parser = PydanticOutputParser(pydantic_object=BrandInfo)
-        parsed = parser.parse(response['text'])
+        resp = get_an_answer(startDate,endDate, destination, tickets, adventurousness)
 
-        response["body"] = json.dumps(parsed)
+        response["body"] = resp
 
     except Exception as e:
         response["statusCode"] = 500
         response["body"] = str(e)
     return response
-
-if __name__ == "__main__":
-    query = "a cool hip new hosting website brand aimed at developers and startups"
-    response = get_an_answer(question=query)
-    parser = PydanticOutputParser(pydantic_object=BrandInfo)
-    parsed = parser.parse(response['text'])
-    print(parsed)

@@ -11,7 +11,7 @@ function App() {
     tickets: 1,
     adventurousness: 5,
   })
-  const [itinerary, setItinerary] = useState('')
+  const [itinerary, setItinerary] = useState('...')
   const [loading, setLoading] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -28,7 +28,8 @@ function App() {
         body: JSON.stringify(formData),
       })
       const data = await response.json()
-      setItinerary(data.result)
+      console.log(data.text)
+      setItinerary(data.text)
     } catch (err) {
       setItinerary('Something went wrong.')
     } finally {
