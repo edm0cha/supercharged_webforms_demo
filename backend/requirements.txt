@@ -1,0 +1,11 @@
+aiohappyeyeballs==2.6.1
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+httpx-sse==0.4.0
+orjson==3.10.18
+packaging==24.2
+propcache==0.3.2
+python-dotenv==1.1.0
+urllib3==2.4.0
+zstandard==0.23.0
