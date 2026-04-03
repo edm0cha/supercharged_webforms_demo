@@ -29,7 +29,7 @@ Location, Date, time and number or people that are going the trip and how advent
 with that you need to generate a full itinerary agenda with places to go, important landmakrs, things to do
 
 <arrive-date>{arrive_date}</arrive-date>
-<departure-date>{arrive_date}</departure-date>
+<departure-date>{departure_date}</departure-date>
 <place>{destination}</place>
 <passengers>{tickets}</passengers>
 <adventurousness>{adventurousness}</adventurousness>
