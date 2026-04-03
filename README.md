@@ -1,179 +1,167 @@
-# GenAI Flight App – Serverless Workshop Repo
+# AI Travel Planner – Serverless Workshop Repo
 
-Welcome to the **GenAI Flight App** workshop! In this hands-on session, you'll build and deploy a fully serverless application powered by AWS services and Generative AI.
-
----
-
-## ✈️ What You'll Build
-A simple flight booking web app where users can:
-- Search for flights using a mock backend (AWS Lambda)
-- “Purchase” tickets and generate a custom travel itinerary
-- Adjust the "Adventurousness" level and number of passengers
-- Deploy everything using CI/CD pipelines
+Welcome to the **AI Travel Planner** workshop! In this hands-on session, you'll build and deploy a fully serverless application powered by AWS services and Generative AI.
 
 ---
 
-## 🧱 Tech Stack
+## What You'll Build
+
+A travel itinerary web app where users can:
+- Enter a destination, travel dates, and number of passengers
+- Adjust an "Adventurousness" level (1–10)
+- Generate a custom AI-powered travel itinerary via Amazon Bedrock
+
+---
+
+## Tech Stack
+
 - **Frontend:** React + Vite + TypeScript
-- **Backend:** AWS Lambda (Python)
-- **API Gateway** (REST)
-- **Bedrock** (for itinerary generation)
-- **CI/CD:** GitHub Actions
-- **Infrastructure:** Terraform (S3, Lambda, API Gateway, IAM)
+- **Backend:** AWS Lambda (Python 3.12) with LangChain + Amazon Bedrock (Claude v2)
+- **Delivery:** CloudFront (serves the frontend from S3 and proxies API requests to Lambda)
+- **Storage:** DynamoDB (provisioned for trip data)
+- **Infrastructure:** Terraform (S3, CloudFront, Lambda Function URL, DynamoDB, IAM, CloudWatch)
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
+
 ```
-genai-flight-app/
-├── frontend/                  # React app (Vite)
-│   ├── public/
+supercharged-webforms-demo/
+├── frontend/                  # React app (Vite + TypeScript)
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── FlightSearchForm.tsx
-│   │   │   ├── FlightResults.tsx
-│   │   │   ├── ItineraryModal.tsx
-│   │   └── App.tsx
+│   │   └── App.tsx            # Main component: form + itinerary display
+│   ├── .env.example           # Environment variable template
 │   ├── package.json
 │   └── vite.config.ts
 ├── backend/
-│   ├── searchLambda/         # Handles flight search (Python)
-│   │   └── handler.py
-│   └── itineraryLambda/      # Generates itineraries using Bedrock (Python)
-│       └── handler.py
-├── infrastructure/           # Terraform for AWS resources
-│   └── terraform/
-│       ├── main.tf
-│       ├── variables.tf
-│       └── outputs.tf
-├── .github/workflows/        # CI/CD pipeline
+│   └── lambda.py              # Lambda handler: calls Bedrock to generate itinerary
+├── infrastructure/            # Terraform for all AWS resources
+│   ├── main.tf                # Root module wiring
+│   ├── variables.tf
+│   ├── outputs.tf             # Outputs: cloudfront_url, function_url
+│   ├── terraform.tfvars       # project_name, owner, region
+│   └── modules/
+│       ├── lambda/            # Lambda function + Function URL + IAM + CloudWatch
+│       ├── static/            # S3 bucket + CloudFront distribution
+│       └── dynamodb/          # DynamoDB table
 └── README.md
 ```
 
 ---
 
-## 🚀 Workshop Setup
+## Workshop Setup
 
 ### 1. Prerequisites
+
 - AWS Account with programmatic access (IAM user or role)
-- Node.js 18+, npm or pnpm
+- Node.js 18+ and Yarn
 - Terraform CLI
-- GitHub account (to fork/clone)
+- AWS CLI configured (`aws configure`)
 
 ### 2. Clone This Repo
+
 ```bash
-git clone https://github.com/your-org/genai-flight-app.git
-cd genai-flight-app
+git clone https://github.com/your-org/supercharged-webforms-demo.git
+cd supercharged-webforms-demo
 ```
 
 ### 3. Frontend: Local Dev
+
 ```bash
 cd frontend
-npm install
-npm run dev
+yarn install
+yarn dev
 ```
 
-### 4. Deploy Infrastructure
+The frontend reads `VITE_API_URL` from a `.env` file. Copy the example to get started:
+
 ```bash
-cd infrastructure/terraform
+cp .env.example .env
+```
+
+Update `VITE_API_URL` with your CloudFront URL after deploying infrastructure (step 4).
+
+### 4. Deploy Infrastructure
+
+```bash
+cd infrastructure
 terraform init
 terraform apply
 ```
 
-This will provision:
-- S3 bucket to host the frontend
-- Two Lambda functions (search + itinerary)
-- API Gateway with two endpoints
-- IAM roles with least-privilege policies
+This provisions:
+- **S3 bucket** to host the compiled frontend
+- **CloudFront distribution** serving the frontend and proxying `/generate-itinerary` to the Lambda
+- **Lambda function** (Python 3.12) with a Function URL
+- **DynamoDB table** for trip data
+- **IAM roles** with least-privilege policies (Bedrock, DynamoDB, CloudWatch)
+- **CloudWatch log group** for Lambda logs
 
-### 5. CI/CD Pipeline
-- Triggered on `push` or `pull_request`
-- Runs tests, lint, security scans
-- Deploys Lambdas & S3 bucket
+After `terraform apply`, Terraform outputs:
 
-> You'll connect your AWS credentials using GitHub Actions secrets:
-> `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+```
+cloudfront_url = "https://<id>.cloudfront.net"
+function_url   = "https://<id>.lambda-url.us-east-1.on.aws/"
+```
+
+Set `VITE_API_URL` in `frontend/.env` to the `cloudfront_url` value.
+
+### 5. Build and Upload Frontend
+
+```bash
+cd frontend
+yarn build
+aws s3 sync dist/ s3://<your-bucket-name>/ --delete
+```
 
 ---
 
-## 🧪 Testing
-- `npm run lint` – ESLint
-- `npm run test` – Unit tests for React components
-- Backend Lambdas include sample test files
+## How It Works
+
+### Frontend (`App.tsx`)
+
+A single-page form that collects:
+- Destination
+- Start and end dates
+- Number of passengers (tickets)
+- Adventurousness level (slider 1–10)
+
+On submit, it POSTs to `${VITE_API_URL}/generate-itinerary` and displays the AI-generated itinerary text.
+
+### Backend (`lambda.py`)
+
+Python Lambda that:
+1. Parses the POST body (`destination`, `startDate`, `endDate`, `tickets`, `adventurousness`)
+2. Builds a LangChain prompt and invokes Amazon Bedrock (`anthropic.claude-v2`)
+3. Returns the generated itinerary text as a JSON response
+
+### Infrastructure Flow
+
+```
+User Browser
+    └── CloudFront
+            ├── /* → S3 (React app)
+            └── /generate-itinerary → Lambda Function URL
+```
 
 ---
 
-## 🧠 Workshop Goals
+## Terraform Variables
+
+Edit `infrastructure/terraform.tfvars` to set:
+
+```hcl
+project_name = "supercharged-webforms-demo"
+owner        = "your-name"
+region       = "us-east-1"   # optional, defaults to us-east-1
+```
+
+---
+
+## Workshop Goals
+
 By the end of this session, you'll:
 - Understand serverless architecture fundamentals
-- Deploy a GenAI-powered app using Bedrock
-- Automate your pipeline using GitHub Actions
-- Leave with a real, working project in your AWS account!
-
----
-
-## 💻 Frontend Code Overview
-The frontend is built with **React + Vite + TypeScript** and has three main parts:
-
-### `FlightSearchForm.tsx`
-- A form to select:
-  - Departure city
-  - Arrival city
-  - Departure and return dates
-  - Number of passengers
-- Submits a request to `/search-flights` API endpoint
-
-### `FlightResults.tsx`
-- Displays a list of flight options returned by the backend
-- Each option has a "Buy" button that triggers the itinerary modal
-
-### `ItineraryModal.tsx`
-- Pops up after "Buy" is clicked
-- Asks user if they want an itinerary
-- If yes:
-  - Lets them select "Adventurousness" (slider 0–10)
-  - Calls `/generate-itinerary` with all details
-  - Displays AI-generated itinerary
-
-### `App.tsx`
-- Manages routes, state, and layout
-- Passes props to all components
-
-All API URLs should be injected via `.env` file (e.g., `VITE_API_BASE_URL`).
-
----
-
-## 🔧 Backend Lambdas
-
-### `searchLambda`
-- Python-based AWS Lambda function
-- Accepts POST body with:
-  - origin
-  - destination
-  - departureDate
-  - returnDate
-  - passengers
-- Returns mocked flight data (pre-defined list or generated objects)
-
-### `itineraryLambda`
-- Python-based Lambda connected to Amazon Bedrock
-- Accepts POST body with:
-  - destination
-  - startDate
-  - endDate
-  - passengers
-  - adventurousness (0–10)
-- Calls Bedrock (e.g., Claude or Titan) with a prompt template
-- Returns a JSON itinerary:
-  ```json
-  [
-    {
-      "day": 1,
-      "title": "Historic City Tour",
-      "description": "Explore famous landmarks and museums",
-      "highlights": ["Old Town", "City Museum", "Central Market"]
-    }
-  ]
-  ```
-
-Next, we can scaffold the `searchLambda/handler.py` to return mocked flights.
+- Deploy a GenAI-powered app using Amazon Bedrock
+- Use CloudFront to unify static hosting and API delivery
+- Leave with a real, working project in your AWS account
